@@ -34,12 +34,36 @@ class ContextAwareAssistant(Agent):
         playback_state_ref: dict,
         room: rtc.Room,
         state_machine_flags: dict,
+        audiobooks_list: list,
+        current_audiobook_index: dict,
+        transcript_managers: dict,
     ) -> None:
         super().__init__(instructions=instructions)
         self.transcript_manager = transcript_manager
         self.playback_state_ref = playback_state_ref
         self.room = room
         self.state_machine_flags = state_machine_flags
+        self.audiobooks_list = audiobooks_list
+        self.current_audiobook_index = current_audiobook_index
+        self.transcript_managers = transcript_managers
+
+    def get_current_audiobook(self):
+        """Get the current audiobook metadata."""
+        current_idx = self.current_audiobook_index["index"]
+        return self.audiobooks_list[current_idx]
+
+    @function_tool
+    async def get_current_audiobook_info(self, context: RunContext) -> str:
+        """Get information about the currently playing audiobook.
+
+        Use this when you need to know which audiobook is currently playing,
+        or when the user asks "What am I listening to?" or "What's this book called?"
+
+        Returns:
+            JSON string with title, author, and duration
+        """
+        current_audiobook = self.get_current_audiobook()
+        return f"Title: {current_audiobook['title']}, Author: {current_audiobook['author']}"
 
     @function_tool
     async def get_story_context(self, context: RunContext) -> str:
@@ -49,7 +73,12 @@ class ContextAwareAssistant(Agent):
         Returns the text that has been heard so far (last 3 minutes of content).
         """
         current_time = self.playback_state_ref.get("current_time", 0)
-        logger.info(f"get_story_context called at playback time: {current_time:.1f}s")
+        current_audiobook = self.get_current_audiobook()
+
+        logger.info(
+            f"get_story_context called for '{current_audiobook['title']}' "
+            f"at playback time: {current_time:.1f}s"
+        )
 
         story_context = self.transcript_manager.get_context_at_time(
             current_time, context_window_seconds=180
@@ -182,6 +211,60 @@ class ContextAwareAssistant(Agent):
         else:
             return f"Skipped {direction} {abs_seconds} seconds"
 
+    @function_tool
+    async def next_audiobook(self, context: RunContext) -> str:
+        """Switch to the next audiobook in the library.
+
+        Use when user says: "next book", "next audiobook", "skip to next book"
+
+        Returns:
+            Confirmation message with new audiobook title
+        """
+        command = {"action": "next_audiobook"}
+        data = json.dumps(command).encode("utf-8")
+        await self.room.local_participant.publish_data(data, reliable=True)
+
+        # Update current audiobook index
+        current_idx = self.current_audiobook_index["index"]
+        next_idx = (current_idx + 1) % len(self.audiobooks_list)
+        self.current_audiobook_index["index"] = next_idx
+
+        # Switch to the new transcript
+        audiobook_id = self.audiobooks_list[next_idx]["id"]
+        if audiobook_id in self.transcript_managers:
+            self.transcript_manager = self.transcript_managers[audiobook_id]
+            logger.info(f"🔄 Switched to transcript for: {self.audiobooks_list[next_idx]['title']}")
+
+        logger.info("🎵 User requested next audiobook")
+        return "Next audiobook"
+
+    @function_tool
+    async def previous_audiobook(self, context: RunContext) -> str:
+        """Switch to the previous audiobook in the library.
+
+        Use when user says: "previous book", "previous audiobook", "go back to previous book"
+
+        Returns:
+            Confirmation message with new audiobook title
+        """
+        command = {"action": "previous_audiobook"}
+        data = json.dumps(command).encode("utf-8")
+        await self.room.local_participant.publish_data(data, reliable=True)
+
+        # Update current audiobook index
+        current_idx = self.current_audiobook_index["index"]
+        prev_idx = (current_idx - 1 + len(self.audiobooks_list)) % len(self.audiobooks_list)
+        self.current_audiobook_index["index"] = prev_idx
+
+        # Switch to the new transcript
+        audiobook_id = self.audiobooks_list[prev_idx]["id"]
+        if audiobook_id in self.transcript_managers:
+            self.transcript_manager = self.transcript_managers[audiobook_id]
+            logger.info(f"🔄 Switched to transcript for: {self.audiobooks_list[prev_idx]['title']}")
+
+        logger.info("🎵 User requested previous audiobook")
+        return "Previous audiobook"
+
     # To add tools, use the @function_tool decorator.
     # Here's an example that adds a simple weather tool.
     # You also have to add `from livekit.agents import function_tool, RunContext` to the top of this file
@@ -261,6 +344,9 @@ async def my_agent(ctx: JobContext):
     # Track playback state from frontend
     playback_state = {"status": "paused", "current_time": 0}
 
+    # Agent reference (will be set after agent is created)
+    agent_ref = {"agent": None}
+
     def handle_data_received(data: rtc.DataPacket):
         """Handle data channel messages from frontend"""
         nonlocal playback_state
@@ -273,6 +359,9 @@ async def my_agent(ctx: JobContext):
                 current_time = playback_state.get("current_time", 0)
                 status = playback_state.get("status", "unknown")
                 logger.info(f"📊 Playback state update: {current_time:.1f}s ({status})")
+            elif message.get("type") == "audiobook_changed":
+                # Frontend changed audiobook via button click (will be handled after loading audiobooks)
+                pass  # Will be updated below after loading transcript_managers
         except Exception as e:
             logger.error(f"Error handling data: {e}")
 
@@ -293,68 +382,113 @@ async def my_agent(ctx: JobContext):
     try:
         with open(audiobooks_json_path, "r") as f:
             audiobooks = json.load(f)
-            audiobook_metadata = audiobooks[0]  # Use first audiobook
-            logger.info(f"Loaded audiobook metadata: {audiobook_metadata['title']} by {audiobook_metadata['author']}")
+            logger.info(f"Loaded {len(audiobooks)} audiobooks from metadata")
     except Exception as e:
         logger.error(f"Failed to load audiobook metadata: {e}")
-        audiobook_metadata = {
+        audiobooks = [{
+            "id": "unknown",
             "title": "Unknown",
             "author": "Unknown",
             "duration": 0
-        }
+        }]
 
-    # Load transcript manager for context-aware responses
-    # Try to get transcript filename from metadata, otherwise derive from ID
-    transcript_filename = audiobook_metadata.get("transcript_file")
-
-    if not transcript_filename:
-        # Derive from ID: "snow-white-001" -> "snow_white_trans.txt"
-        audiobook_id = audiobook_metadata.get("id", "unknown")
-        # Remove trailing numbers and convert to snake_case
-        base_name = audiobook_id.rsplit("-", 1)[0].replace("-", "_")
-        transcript_filename = f"{base_name}_trans.txt"
-
-    transcript_path = os.path.join(
+    # Load transcript managers for all audiobooks
+    transcript_managers = {}
+    transcript_dir = os.path.join(
         os.path.dirname(__file__),
-        "../../agent-starter-react/public/transcript",
-        transcript_filename,
+        "../../agent-starter-react/public/transcript"
     )
 
-    # Fallback if file doesn't exist
-    if not os.path.exists(transcript_path):
-        logger.warning(f"Transcript not found at {transcript_path}")
-        # Try to find any transcript file in the directory
-        transcript_dir = os.path.join(
-            os.path.dirname(__file__),
-            "../../agent-starter-react/public/transcript"
-        )
-        if os.path.exists(transcript_dir):
-            transcript_files = [f for f in os.listdir(transcript_dir) if f.endswith(".txt")]
-            if transcript_files:
-                transcript_path = os.path.join(transcript_dir, transcript_files[0])
-                logger.info(f"Using fallback transcript: {transcript_files[0]}")
-            else:
-                logger.error("No transcript files found!")
+    for audiobook in audiobooks:
+        audiobook_id = audiobook.get("id", "unknown")
+
+        # Try to get transcript filename from metadata, otherwise derive from ID
+        transcript_filename = audiobook.get("transcript_file")
+
+        if not transcript_filename:
+            # Derive from ID: "snow-white-001" -> "snow_white_trans.txt"
+            base_name = audiobook_id.rsplit("-", 1)[0].replace("-", "_")
+            transcript_filename = f"{base_name}_trans.txt"
+
+        transcript_path = os.path.join(transcript_dir, transcript_filename)
+
+        # Load transcript if it exists
+        if os.path.exists(transcript_path):
+            try:
+                manager = TranscriptManager(transcript_path, estimated_wpm=120)
+                transcript_managers[audiobook_id] = manager
+                logger.info(
+                    f"Loaded transcript for '{audiobook['title']}': "
+                    f"{manager.total_words} words, "
+                    f"~{manager.get_total_duration_estimate():.0f}s"
+                )
+            except Exception as e:
+                logger.error(f"Failed to load transcript for {audiobook_id}: {e}")
         else:
-            logger.error(f"Transcript directory not found: {transcript_dir}")
+            logger.warning(f"Transcript not found for {audiobook_id} at {transcript_path}")
 
-    transcript_manager = TranscriptManager(transcript_path, estimated_wpm=120)
-    logger.info(
-        f"Loaded transcript: {transcript_manager.total_words} words, "
-        f"estimated duration: {transcript_manager.get_total_duration_estimate():.0f}s"
-    )
+    # Use first audiobook as default
+    current_audiobook_index = {"index": 0}
+    audiobook_metadata = audiobooks[0]
+    audiobook_id = audiobook_metadata.get("id")
+
+    # Get transcript manager for first audiobook
+    if audiobook_id in transcript_managers:
+        transcript_manager = transcript_managers[audiobook_id]
+    else:
+        # Fallback: create empty transcript manager
+        logger.warning("No transcript available for first audiobook")
+        transcript_manager = TranscriptManager("", estimated_wpm=120)
+
+    # Now update the data handler to handle audiobook changes
+    def handle_audiobook_change_message(message):
+        """Handle audiobook change from physical button clicks"""
+        new_index = message.get("index")
+        audiobook_id = message.get("audiobook_id")
+
+        if new_index is not None and agent_ref["agent"] is not None:
+            # Update the agent's current audiobook index
+            current_audiobook_index["index"] = new_index
+
+            # Switch the agent's transcript manager
+            if audiobook_id in transcript_managers:
+                agent_ref["agent"].transcript_manager = transcript_managers[audiobook_id]
+                audiobook_title = audiobooks[new_index]["title"]
+                logger.info(f"🔄 Physical button pressed - switched to: {audiobook_title}")
+            else:
+                logger.warning(f"No transcript found for audiobook ID: {audiobook_id}")
+
+    # Update the data handler with the audiobook change logic
+    original_handler = handle_data_received
+    def handle_data_received_with_audiobook(data: rtc.DataPacket):
+        nonlocal playback_state
+        try:
+            message = json.loads(data.data.decode("utf-8"))
+            if message.get("type") == "playback_state":
+                playback_state.clear()
+                playback_state.update(message)
+                current_time = playback_state.get("current_time", 0)
+                status = playback_state.get("status", "unknown")
+                logger.info(f"📊 Playback state update: {current_time:.1f}s ({status})")
+            elif message.get("type") == "audiobook_changed":
+                handle_audiobook_change_message(message)
+        except Exception as e:
+            logger.error(f"Error handling data: {e}")
+
+    # Replace the handler
+    ctx.room.off("data_received", handle_data_received)
+    ctx.room.on("data_received", handle_data_received_with_audiobook)
 
     def create_context_aware_instructions() -> str:
         """Generate instructions that rely on function tools for current context"""
-        duration_minutes = int(audiobook_metadata.get("duration", 0) / 60)
 
-        instructions = f"""You are a helpful voice AI audiobook companion.
-The user is listening to {audiobook_metadata['title']}.
+        instructions = """You are a helpful voice AI audiobook companion.
+The user is listening to audiobooks and can switch between different books.
 
-**Audiobook Information:**
-- Title: {audiobook_metadata['title']}
-- Author: {audiobook_metadata['author']}
-- Total Duration: approximately {duration_minutes} minutes
+**IMPORTANT - Know What You're Discussing:**
+- ALWAYS use get_current_audiobook_info() tool when answering questions about the story
+- The audiobook can change when the user switches tracks
+- Use the tool to know the current title and author before answering questions
 
 **CRITICAL SPOILER PREVENTION RULE:**
 - Only discuss events, characters, and plot points from the story that have been heard so far
@@ -428,6 +562,12 @@ You can control audiobook playback when the user requests it. Listen for these p
   → Use skip_time(seconds=-30) or skip_time(seconds=-120)
   → "a bit" = 30 seconds by default
 
+- **Next Audiobook**: "next book", "next audiobook", "skip to next book"
+  → Use next_audiobook() tool
+
+- **Previous Audiobook**: "previous book", "previous audiobook", "go back to previous book"
+  → Use previous_audiobook() tool
+
 **Important for time parsing:**
 - Convert "X minutes" to seconds: multiply by 60
 - Convert "X seconds" to seconds: use as-is
@@ -461,11 +601,24 @@ Remember: Answer the specific question asked. Be helpful and informative without
         "resume_pending": False
     }
 
+    # Create the agent
+    agent = ContextAwareAssistant(
+        initial_instructions,
+        transcript_manager,
+        playback_state,
+        ctx.room,
+        state_machine_flags,
+        audiobooks,
+        current_audiobook_index,
+        transcript_managers,
+    )
+
+    # Store agent reference for physical button handler
+    agent_ref["agent"] = agent
+
     # Start the session, which initializes the voice pipeline and warms up the models
     await session.start(
-        agent=ContextAwareAssistant(
-            initial_instructions, transcript_manager, playback_state, ctx.room, state_machine_flags
-        ),
+        agent=agent,
         room=ctx.room,
         room_options=room_io.RoomOptions(
             audio_input=room_io.AudioInputOptions(

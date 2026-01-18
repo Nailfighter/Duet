@@ -20,6 +20,8 @@ export function AudioPlayer() {
   const [duration, setDuration] = useState(0);
   const [playbackSpeed, setPlaybackSpeed] = useState(1.0);
   const [audiobook, setAudiobook] = useState<Audiobook | null>(null);
+  const [audiobooks, setAudiobooks] = useState<Audiobook[]>([]);
+  const [currentIndex, setCurrentIndex] = useState(0);
   const [volume, setVolume] = useState(1.0); // 1.0 = full volume, 0.2 = ducked
   const audioRef = useRef<HTMLAudioElement>(null);
   const resumeTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -29,6 +31,7 @@ export function AudioPlayer() {
     fetch('/audiobooks.json')
       .then((res) => res.json())
       .then((data: Audiobook[]) => {
+        setAudiobooks(data);
         if (data.length > 0) {
           const book = data[0];
           setAudiobook(book);
@@ -95,6 +98,38 @@ export function AudioPlayer() {
           setPlaybackSpeed(newSpeed);
           if (audioRef.current) {
             audioRef.current.playbackRate = newSpeed;
+          }
+        } else if (data.action === 'next_audiobook') {
+          console.log('[AudioPlayer] ⏭️ NEXT AUDIOBOOK');
+          const nextIndex = (currentIndex + 1) % audiobooks.length;
+          setCurrentIndex(nextIndex);
+          const nextBook = audiobooks[nextIndex];
+          setAudiobook(nextBook);
+          setCurrentTime(0);
+          if (nextBook.duration) {
+            setDuration(nextBook.duration);
+          }
+          if (audioRef.current) {
+            audioRef.current.currentTime = 0;
+            if (isPlaying) {
+              audioRef.current.play();
+            }
+          }
+        } else if (data.action === 'previous_audiobook') {
+          console.log('[AudioPlayer] ⏮️ PREVIOUS AUDIOBOOK');
+          const prevIndex = (currentIndex - 1 + audiobooks.length) % audiobooks.length;
+          setCurrentIndex(prevIndex);
+          const prevBook = audiobooks[prevIndex];
+          setAudiobook(prevBook);
+          setCurrentTime(0);
+          if (prevBook.duration) {
+            setDuration(prevBook.duration);
+          }
+          if (audioRef.current) {
+            audioRef.current.currentTime = 0;
+            if (isPlaying) {
+              audioRef.current.play();
+            }
           }
         }
       } catch (e) {
@@ -205,6 +240,102 @@ export function AudioPlayer() {
     }
   };
 
+  const nextAudiobook = () => {
+    if (audiobooks.length === 0) return;
+    const wasPlaying = isPlaying;
+
+    // Pause current audio first
+    if (audioRef.current) {
+      audioRef.current.pause();
+    }
+    setIsPlaying(false);
+
+    const nextIndex = (currentIndex + 1) % audiobooks.length;
+    setCurrentIndex(nextIndex);
+    const nextBook = audiobooks[nextIndex];
+    setAudiobook(nextBook);
+    setCurrentTime(0);
+    if (nextBook.duration) {
+      setDuration(nextBook.duration);
+    }
+
+    // Notify agent about audiobook change
+    if (session.room?.localParticipant) {
+      const encoder = new TextEncoder();
+      const message = {
+        type: 'audiobook_changed',
+        index: nextIndex,
+        audiobook_id: nextBook.id,
+      };
+      const data = encoder.encode(JSON.stringify(message));
+      session.room.localParticipant.publishData(data, { reliable: true });
+      console.log('[AudioPlayer] 📢 Notified agent of audiobook change:', nextBook.title);
+    }
+
+    // Wait for new audio to load before playing
+    if (audioRef.current && wasPlaying) {
+      const handleCanPlay = () => {
+        audioRef.current?.play()
+          .then(() => {
+            setIsPlaying(true); // Update UI state when play succeeds
+          })
+          .catch(err => {
+            console.error('[AudioPlayer] Error playing next audiobook:', err);
+          });
+        audioRef.current?.removeEventListener('canplay', handleCanPlay);
+      };
+      audioRef.current.addEventListener('canplay', handleCanPlay);
+    }
+  };
+
+  const previousAudiobook = () => {
+    if (audiobooks.length === 0) return;
+    const wasPlaying = isPlaying;
+
+    // Pause current audio first
+    if (audioRef.current) {
+      audioRef.current.pause();
+    }
+    setIsPlaying(false);
+
+    const prevIndex = (currentIndex - 1 + audiobooks.length) % audiobooks.length;
+    setCurrentIndex(prevIndex);
+    const prevBook = audiobooks[prevIndex];
+    setAudiobook(prevBook);
+    setCurrentTime(0);
+    if (prevBook.duration) {
+      setDuration(prevBook.duration);
+    }
+
+    // Notify agent about audiobook change
+    if (session.room?.localParticipant) {
+      const encoder = new TextEncoder();
+      const message = {
+        type: 'audiobook_changed',
+        index: prevIndex,
+        audiobook_id: prevBook.id,
+      };
+      const data = encoder.encode(JSON.stringify(message));
+      session.room.localParticipant.publishData(data, { reliable: true });
+      console.log('[AudioPlayer] 📢 Notified agent of audiobook change:', prevBook.title);
+    }
+
+    // Wait for new audio to load before playing
+    if (audioRef.current && wasPlaying) {
+      const handleCanPlay = () => {
+        audioRef.current?.play()
+          .then(() => {
+            setIsPlaying(true); // Update UI state when play succeeds
+          })
+          .catch(err => {
+            console.error('[AudioPlayer] Error playing previous audiobook:', err);
+          });
+        audioRef.current?.removeEventListener('canplay', handleCanPlay);
+      };
+      audioRef.current.addEventListener('canplay', handleCanPlay);
+    }
+  };
+
   const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newTime = parseFloat(e.target.value);
     setCurrentTime(newTime); // Update UI immediately for responsiveness
@@ -306,7 +437,7 @@ export function AudioPlayer() {
         <div className="mb-6 flex items-center justify-center gap-3 px-4">
           {/* Previous Track */}
           <button
-            onClick={skipBackward}
+            onClick={previousAudiobook}
             className="flex h-12 w-12 items-center justify-center rounded-full transition hover:bg-gray-100"
           >
             <SkipBack size={28} weight="fill" />
@@ -379,7 +510,7 @@ export function AudioPlayer() {
 
           {/* Next Track */}
           <button
-            onClick={skipForward}
+            onClick={nextAudiobook}
             className="flex h-12 w-12 items-center justify-center rounded-full transition hover:bg-gray-100"
           >
             <SkipForward size={28} weight="fill" />

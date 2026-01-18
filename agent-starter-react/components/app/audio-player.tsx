@@ -114,7 +114,10 @@ export function AudioPlayer() {
 
   // Send playback state to agent periodically
   useEffect(() => {
-    if (!session.room || !session.isConnected) return;
+    if (!session.room || !session.isConnected) {
+      console.log('[AudioPlayer] Not connected yet, skipping playback state broadcast');
+      return;
+    }
 
     const sendPlaybackState = () => {
       const encoder = new TextEncoder();
@@ -124,6 +127,7 @@ export function AudioPlayer() {
         current_time: currentTime,
         duration: duration,
       };
+      console.log('[AudioPlayer] 📤 Sending playback state:', state);
       const data = encoder.encode(JSON.stringify(state));
       session.room?.localParticipant?.publishData(data, { reliable: true });
     };

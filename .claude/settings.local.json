@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "Bash(python3:*)",
-      "Bash(uv run:*)"
+      "Bash(uv run:*)",
+      "Bash(source:*)",
+      "Bash(python -m pytest tests/test_transcript_manager.py -v)"
     ]
   }
 }

@@ -4,7 +4,20 @@
       "Bash(python3:*)",
       "Bash(uv run:*)",
       "Bash(source:*)",
-      "Bash(python -m pytest tests/test_transcript_manager.py -v)"
+      "Bash(python -m pytest tests/test_transcript_manager.py -v)",
+      "Bash(.venv/bin/pytest tests/test_transcript_manager.py -v)",
+      "Bash(PYTHONPATH=. .venv/bin/python:*)",
+      "Bash(chmod:*)",
+      "Bash(pip install:*)",
+      "Bash(.venv/bin/pip install:*)",
+      "Bash(tee:*)",
+      "Bash(uv pip install:*)",
+      "Bash(pkill -f \"pip install sentence-transformers\")",
+      "Bash(.venv/bin/pytest tests/test_transcript_manager.py::test_semantic_search_exact_phrase -v)",
+      "Bash(python -m pytest:*)",
+      "Bash(/var/data/python/bin/pytest tests/test_transcript_manager.py::test_chunk_creation -v)",
+      "Bash(PYTHONPATH=src /var/data/python/bin/pytest:*)",
+      "Bash(PYTHONPATH=. /var/data/python/bin/pytest:*)"
     ]
   }
 }

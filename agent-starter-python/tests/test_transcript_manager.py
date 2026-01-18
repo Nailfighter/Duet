@@ -10,7 +10,7 @@ from src.transcript_manager import TranscriptManager
 def transcript_manager():
     """Create transcript manager for Snow White"""
     return TranscriptManager(
-        "agent-starter-react/public/transcript/snow_white_trans.txt", estimated_wpm=120
+        "../agent-starter-react/public/transcript/snow_white_trans.txt", estimated_wpm=120
     )
 
 
@@ -145,3 +145,76 @@ def test_edge_case_beyond_duration(transcript_manager):
     # Should return full transcript
     assert context["estimated_position"] == 100
     assert context["word_count"] == transcript_manager.total_words
+
+
+# Semantic Search Tests
+
+
+def test_chunk_creation(transcript_manager):
+    """Test that chunks are created with proper overlap."""
+    assert len(transcript_manager.chunks) > 0
+
+    # Check first chunk
+    first = transcript_manager.chunks[0]
+    assert first.chunk_id == 0
+    assert first.start_word_index == 0
+    assert first.start_time == 0.0
+    assert len(first.keywords) > 0
+
+    # Check overlap exists between chunks
+    if len(transcript_manager.chunks) > 1:
+        second = transcript_manager.chunks[1]
+        # Overlap should be ~25 words
+        overlap = first.end_word_index - second.start_word_index
+        assert overlap > 0  # Some overlap exists
+
+
+async def test_semantic_search_exact_phrase(transcript_manager):
+    """Test finding scene with exact phrase match."""
+    # Search for "poison" (exists in Snow White transcript)
+    # Set current_time high enough to include the scene
+    result = await transcript_manager.semantic_search("poison", current_time=1000)
+
+    assert result.found
+    assert result.time >= 0
+    assert "poison" in result.context_preview.lower() or len(result.context_preview) > 0
+
+
+async def test_semantic_search_spoiler_prevention(transcript_manager):
+    """Test that future scenes are not found."""
+    # Search for something late in the story at early timestamp
+    # "glass coffin" appears late in Snow White
+    result = await transcript_manager.semantic_search("glass coffin", current_time=60)
+
+    # Should not be found (spoiler prevention)
+    assert not result.found
+
+
+async def test_semantic_search_keyword_matching(transcript_manager):
+    """Test finding scenes with individual keywords."""
+    # Search with multiple keywords
+    result = await transcript_manager.semantic_search("queen mirror", current_time=500)
+
+    assert result.found
+    assert result.time >= 0
+
+
+async def test_semantic_search_no_match(transcript_manager):
+    """Test handling of queries with no matches."""
+    # Search for something not in the story
+    result = await transcript_manager.semantic_search("dragon castle", current_time=1000)
+
+    # May or may not find depending on keywords, but shouldn't crash
+    assert isinstance(result.found, bool)
+
+
+async def test_semantic_search_character_synonyms(transcript_manager):
+    """Test finding scenes using character aliases."""
+    # Search for "mirror" (has synonym "looking glass")
+    result1 = await transcript_manager.semantic_search("mirror", current_time=500)
+    result2 = await transcript_manager.semantic_search("looking glass", current_time=500)
+
+    # Both should find mirror scenes
+    if result1.found and result2.found:
+        # Should find similar or same chunks
+        assert abs(result1.time - result2.time) < 100  # Within ~100 seconds

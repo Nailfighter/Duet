@@ -265,6 +265,82 @@ class ContextAwareAssistant(Agent):
         logger.info("🎵 User requested previous audiobook")
         return "Previous audiobook"
 
+    @function_tool
+    async def navigate_to_scene(self, context: RunContext, description: str) -> str:
+        """Navigate to a specific scene or moment in the audiobook.
+
+        Use this when the user asks to find or go to a specific scene, event,
+        character moment, or topic in the audiobook.
+
+        Args:
+            description: Natural language description of the scene to find.
+                        Examples: "poison apple", "queen asks the mirror",
+                                 "dwarfs find snow white", "huntsman scene"
+
+        Returns:
+            Confirmation message with scene preview or "not found yet" message
+        """
+        current_time = self.playback_state_ref.get("current_time", 0)
+        current_audiobook = self.get_current_audiobook()
+
+        logger.info(
+            f"🔍 Searching for scene: '{description}' "
+            f"in '{current_audiobook['title']}' at {current_time:.1f}s"
+        )
+
+        # Search entire transcript using LLM-based semantic search (demo mode - no spoiler prevention)
+        result = await self.transcript_manager.semantic_search(
+            query=description,
+            current_time=current_time
+        )
+
+        if not result.found:
+            logger.info(f"❌ Scene not found: '{description}'")
+            return "I couldn't find that scene in the audiobook."
+
+        # Send seek command to frontend
+        command = {"action": "seek", "time": result.time}
+        data = json.dumps(command).encode("utf-8")
+        await self.room.local_participant.publish_data(data, reliable=True)
+
+        logger.info(
+            f"✅ Navigated to scene at {result.time:.1f}s "
+            f"(chunk {result.chunk_id}, confidence {result.confidence:.2f})"
+        )
+
+        # Return brief confirmation
+        preview = result.context_preview.replace("\n", " ")[:80]
+        return f"Found it: {preview}..."
+
+    @function_tool
+    async def search_earlier_context(self, context: RunContext, topic: str) -> str:
+        """Search for earlier mentions of a topic, character, or event.
+
+        Use this when the user asks about something that happened earlier
+        in the story and it's not in the recent context.
+
+        Args:
+            topic: What to search for (e.g., "huntsman", "queen's mirror")
+
+        Returns:
+            Earlier context mentioning the topic, or "not found" message
+        """
+        current_time = self.playback_state_ref.get("current_time", 0)
+
+        logger.info(f"🔍 Searching earlier context for: '{topic}'")
+
+        result = await self.transcript_manager.semantic_search(
+            query=topic,
+            current_time=current_time
+        )
+
+        if result.found:
+            logger.info(f"✅ Found earlier mention at {result.time:.1f}s")
+            return f"Earlier mention: {result.context_preview}"
+        else:
+            logger.info(f"❌ No earlier mention found for: '{topic}'")
+            return "I don't recall that being mentioned yet in what we've heard."
+
     # To add tools, use the @function_tool decorator.
     # Here's an example that adds a simple weather tool.
     # You also have to add `from livekit.agents import function_tool, RunContext` to the top of this file
@@ -415,7 +491,11 @@ async def my_agent(ctx: JobContext):
         # Load transcript if it exists
         if os.path.exists(transcript_path):
             try:
-                manager = TranscriptManager(transcript_path, estimated_wpm=120)
+                manager = TranscriptManager(
+                    transcript_path,
+                    estimated_wpm=120,
+                    openai_api_key=os.getenv("OPENAI_API_KEY")
+                )
                 transcript_managers[audiobook_id] = manager
                 logger.info(
                     f"Loaded transcript for '{audiobook['title']}': "
@@ -438,7 +518,11 @@ async def my_agent(ctx: JobContext):
     else:
         # Fallback: create empty transcript manager
         logger.warning("No transcript available for first audiobook")
-        transcript_manager = TranscriptManager("", estimated_wpm=120)
+        transcript_manager = TranscriptManager(
+            "",
+            estimated_wpm=120,
+            openai_api_key=os.getenv("OPENAI_API_KEY")
+        )
 
     # Now update the data handler to handle audiobook changes
     def handle_audiobook_change_message(message):
@@ -568,6 +652,21 @@ You can control audiobook playback when the user requests it. Listen for these p
 - **Previous Audiobook**: "previous book", "previous audiobook", "go back to previous book"
   → Use previous_audiobook() tool
 
+- **Navigate to Scene**: "take me to [scene]", "skip to [moment]", "find [event]"
+  → Use navigate_to_scene(description="...") tool
+  → Examples:
+    - "Take me to the poison apple scene" → navigate_to_scene(description="poison apple")
+    - "Skip to when the queen asks the mirror" → navigate_to_scene(description="queen mirror")
+    - "Go back to the huntsman" → navigate_to_scene(description="huntsman")
+  → This searches the entire audiobook transcript, so you can jump to any scene
+
+- **Search Earlier Context**: When user asks about earlier events not in recent context
+  → Use search_earlier_context(topic="...") tool
+  → Examples:
+    - "Remind me why the queen hates Snow White?" → search_earlier_context(topic="queen hates snow white")
+    - "What did the huntsman do earlier?" → search_earlier_context(topic="huntsman")
+  → Returns earlier context mentioning the topic
+
 **Important for time parsing:**
 - Convert "X minutes" to seconds: multiply by 60
 - Convert "X seconds" to seconds: use as-is
@@ -582,6 +681,7 @@ You can control audiobook playback when the user requests it. Listen for these p
 **Response style for commands:**
 - Keep confirmations VERY brief: just one word like "Paused", "Playing", "Muted"
 - For skip commands: "Skipped forward 1 minute" or "Skipped back 30 seconds"
+- For scene navigation: Just say what you found: "Found it: [preview]..."
 - NEVER add extra phrases like "Let me know if...", "Just ask if...", "Would you like..."
 - NEVER offer additional options after executing a command
 - Just confirm what was done and stop talking

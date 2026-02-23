@@ -69,7 +69,7 @@ export default async function RootLayout({ children }: RootLayoutProps) {
         <meta name="description" content={pageDescription} />
       </head>
       <body className="overflow-x-hidden">
-          {children}
+        {children}
       </body>
     </html>
   );

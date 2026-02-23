@@ -13,7 +13,7 @@ import { Toaster } from '@/components/livekit/toaster';
 import { useAgentErrors } from '@/hooks/useAgentErrors';
 import { useDebugMode } from '@/hooks/useDebug';
 import { getSandboxTokenSource } from '@/lib/utils';
-import { SplitScreenLayout } from '@/components/app/split-screen-layout';
+import { ViewController } from '@/components/app/view-controller';
 
 const IN_DEVELOPMENT = process.env.NODE_ENV !== 'production';
 
@@ -44,7 +44,7 @@ export function App({ appConfig }: AppProps) {
     <SessionProvider session={session}>
       <AppSetup />
       <main className="h-screen w-screen overflow-hidden">
-        <SplitScreenLayout />
+        <ViewController appConfig={appConfig} />
       </main>
       <StartAudio label="Start Audio" />
       <RoomAudioRenderer />

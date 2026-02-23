@@ -1,4 +1,4 @@
-import { Public_Sans } from 'next/font/google';
+import { Public_Sans, Space_Mono } from 'next/font/google';
 import localFont from 'next/font/local';
 import { headers } from 'next/headers';
 import { cn, getAppConfig, getStyles } from '@/lib/utils';
@@ -6,6 +6,12 @@ import '@/styles/globals.css';
 
 const publicSans = Public_Sans({
   variable: '--font-public-sans',
+  subsets: ['latin'],
+});
+
+const spaceMono = Space_Mono({
+  variable: '--font-space-mono',
+  weight: ['400', '700'],
   subsets: ['latin'],
 });
 
@@ -53,6 +59,7 @@ export default async function RootLayout({ children }: RootLayoutProps) {
       className={cn(
         publicSans.variable,
         commitMono.variable,
+        spaceMono.variable,
         'scroll-smooth font-sans antialiased'
       )}
     >

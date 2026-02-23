@@ -23,7 +23,7 @@ export interface AppConfig {
 
 export const APP_CONFIG_DEFAULTS: AppConfig = {
   companyName: 'LiveKit',
-  pageTitle: 'LiveKit Voice Agent',
+  pageTitle: 'Duet',
   pageDescription: 'A voice agent built with LiveKit',
 
   supportsChatInput: true,
@@ -31,11 +31,11 @@ export const APP_CONFIG_DEFAULTS: AppConfig = {
   supportsScreenShare: true,
   isPreConnectBufferEnabled: true,
 
-  logo: '/lk-logo.svg',
+  logo: '',
   accent: '#002cf2',
-  logoDark: '/lk-logo-dark.svg',
+  logoDark: '',
   accentDark: '#1fd5f9',
-  startButtonText: 'Start call',
+  startButtonText: 'Play Audiobook',
 
   // agent dispatch configuration
   agentName: undefined,

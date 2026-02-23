@@ -1,60 +1,208 @@
-import { Button } from '@/components/livekit/button';
+'use client';
 
-function WelcomeImage() {
-  return (
-    <svg
-      width="64"
-      height="64"
-      viewBox="0 0 64 64"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      className="text-fg0 mb-4 size-16"
-    >
-      <path
-        d="M15 24V40C15 40.7957 14.6839 41.5587 14.1213 42.1213C13.5587 42.6839 12.7956 43 12 43C11.2044 43 10.4413 42.6839 9.87868 42.1213C9.31607 41.5587 9 40.7957 9 40V24C9 23.2044 9.31607 22.4413 9.87868 21.8787C10.4413 21.3161 11.2044 21 12 21C12.7956 21 13.5587 21.3161 14.1213 21.8787C14.6839 22.4413 15 23.2044 15 24ZM22 5C21.2044 5 20.4413 5.31607 19.8787 5.87868C19.3161 6.44129 19 7.20435 19 8V56C19 56.7957 19.3161 57.5587 19.8787 58.1213C20.4413 58.6839 21.2044 59 22 59C22.7956 59 23.5587 58.6839 24.1213 58.1213C24.6839 57.5587 25 56.7957 25 56V8C25 7.20435 24.6839 6.44129 24.1213 5.87868C23.5587 5.31607 22.7956 5 22 5ZM32 13C31.2044 13 30.4413 13.3161 29.8787 13.8787C29.3161 14.4413 29 15.2044 29 16V48C29 48.7957 29.3161 49.5587 29.8787 50.1213C30.4413 50.6839 31.2044 51 32 51C32.7956 51 33.5587 50.6839 34.1213 50.1213C34.6839 49.5587 35 48.7957 35 48V16C35 15.2044 34.6839 14.4413 34.1213 13.8787C33.5587 13.3161 32.7956 13 32 13ZM42 21C41.2043 21 40.4413 21.3161 39.8787 21.8787C39.3161 22.4413 39 23.2044 39 24V40C39 40.7957 39.3161 41.5587 39.8787 42.1213C40.4413 42.6839 41.2043 43 42 43C42.7957 43 43.5587 42.6839 44.1213 42.1213C44.6839 41.5587 45 40.7957 45 40V24C45 23.2044 44.6839 22.4413 44.1213 21.8787C43.5587 21.3161 42.7957 21 42 21ZM52 17C51.2043 17 50.4413 17.3161 49.8787 17.8787C49.3161 18.4413 49 19.2044 49 20V44C49 44.7957 49.3161 45.5587 49.8787 46.1213C50.4413 46.6839 51.2043 47 52 47C52.7957 47 53.5587 46.6839 54.1213 46.1213C54.6839 45.5587 55 44.7957 55 44V20C55 19.2044 54.6839 18.4413 54.1213 17.8787C53.5587 17.3161 52.7957 17 52 17Z"
-        fill="currentColor"
-      />
-    </svg>
-  );
+import { useState, useEffect } from 'react';
+
+interface Audiobook {
+  id: string;
+  title: string;
+  author: string;
+  cover_image: string;
+  audio_file: string;
+  duration: number;
 }
 
 interface WelcomeViewProps {
   startButtonText: string;
   onStartCall: () => void;
+  onAudiobookSelect?: (index: number) => void;
 }
 
 export const WelcomeView = ({
   startButtonText,
   onStartCall,
+  onAudiobookSelect,
   ref,
 }: React.ComponentProps<'div'> & WelcomeViewProps) => {
+  const [audiobooks, setAudiobooks] = useState<Audiobook[]>([]);
+  const [selectedIndex, setSelectedIndex] = useState(0);
+
+  useEffect(() => {
+    fetch('/audiobooks.json')
+      .then((res) => res.json())
+      .then((data: Audiobook[]) => {
+        setAudiobooks(data);
+      })
+      .catch((error) => console.error('Error loading audiobook data:', error));
+  }, []);
+
+  const handleSelect = (index: number) => {
+    setSelectedIndex(index);
+    onAudiobookSelect?.(index);
+  };
+
+  const handleStart = () => {
+    // Store the selected audiobook index in localStorage so the audio player can use it
+    localStorage.setItem('selectedAudiobookIndex', selectedIndex.toString());
+    localStorage.setItem('autoplayAudiobook', 'true');
+    console.log('[WelcomeView] Starting with audiobook index:', selectedIndex);
+    onStartCall();
+  };
+
   return (
-    <div ref={ref}>
-      <section className="bg-background flex flex-col items-center justify-center text-center">
-        <WelcomeImage />
+    <div ref={ref} className="min-h-screen bg-background flex items-center justify-center p-8">
+      <div className="max-w-4xl w-full space-y-12">
+        {/* Pixel decorations top */}
+        <div className="flex justify-center gap-4 mb-8">
+          <div className="w-3 h-3 bg-accent-blue"></div>
+          <div className="w-3 h-3 bg-accent-purple"></div>
+          <div className="w-3 h-3 bg-accent-pink"></div>
+          <div className="w-3 h-3 bg-accent-green"></div>
+          <div className="w-3 h-3 bg-accent-yellow"></div>
+        </div>
 
-        <p className="text-foreground max-w-prose pt-1 leading-6 font-medium">
-          Chat live with your voice AI agent
-        </p>
+        {/* Header */}
+        <div className="text-center space-y-6">
+          <div className="relative inline-block">
+            {/* Pixel corner decorations */}
+            <div className="absolute -top-3 -left-3 w-3 h-3 bg-accent-blue"></div>
+            <div className="absolute -top-3 -right-3 w-3 h-3 bg-accent-purple"></div>
+            <div className="absolute -bottom-3 -left-3 w-3 h-3 bg-accent-green"></div>
+            <div className="absolute -bottom-3 -right-3 w-3 h-3 bg-accent-pink"></div>
 
-        <Button variant="primary" size="lg" onClick={onStartCall} className="mt-6 w-64 font-mono">
-          {startButtonText}
-        </Button>
-      </section>
+            <h1 className="text-4xl font-bold text-foreground font-display px-8 py-4 border-4 border-foreground bg-background uppercase">
+              Duet
+            </h1>
+          </div>
 
-      <div className="fixed bottom-5 left-0 flex w-full items-center justify-center">
-        <p className="text-muted-foreground max-w-prose pt-1 text-xs leading-5 font-normal text-pretty md:text-sm">
-          Need help getting set up? Check out the{' '}
-          <a
-            target="_blank"
-            rel="noopener noreferrer"
-            href="https://docs.livekit.io/agents/start/voice-ai/"
-            className="underline"
-          >
-            Voice AI quickstart
-          </a>
-          .
-        </p>
+          {/* Decorative pixel line */}
+          <div className="flex justify-center gap-2">
+            <div className="w-2 h-2 bg-accent-yellow"></div>
+            <div className="w-2 h-2 bg-accent-blue"></div>
+            <div className="w-2 h-2 bg-accent-purple"></div>
+            <div className="w-2 h-2 bg-accent-pink"></div>
+            <div className="w-2 h-2 bg-accent-green"></div>
+          </div>
+
+          <p className="text-lg text-muted-foreground font-sans tracking-wide">
+            INTELLIGENT COMPANION FOR AUDIOBOOKS
+          </p>
+        </div>
+
+        {/* Audiobook Grid */}
+        <div className="space-y-8">
+          {/* Decorative pixel divider */}
+          <div className="flex justify-center items-center gap-3">
+            <div className="w-2 h-2 bg-accent-blue"></div>
+            <div className="w-2 h-2 bg-accent-purple"></div>
+            <h2 className="text-xl font-bold text-foreground font-sans text-center tracking-wide px-4">
+              SELECT YOUR AUDIOBOOK
+            </h2>
+            <div className="w-2 h-2 bg-accent-pink"></div>
+            <div className="w-2 h-2 bg-accent-green"></div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {audiobooks.map((book, index) => {
+              const colorClasses = [
+                { bg: 'bg-accent-blue', text: 'text-accent-blue' },
+                { bg: 'bg-accent-purple', text: 'text-accent-purple' },
+                { bg: 'bg-accent-pink', text: 'text-accent-pink' },
+                { bg: 'bg-accent-green', text: 'text-accent-green' },
+              ];
+              const accentColor = colorClasses[index % colorClasses.length];
+              const isSelected = selectedIndex === index;
+
+              return (
+                <button
+                  key={book.id}
+                  onClick={() => handleSelect(index)}
+                  className={`border-2 border-foreground p-6 text-left transition-all relative ${
+                    isSelected ? 'bg-foreground' : 'bg-background hover:bg-muted'
+                  }`}
+                >
+                  {/* Pixel accent corner */}
+                  <div className={`absolute top-2 right-2 w-2 h-2 ${accentColor.bg}`}></div>
+
+                  <div className="flex gap-4">
+                    <div className={`w-24 h-24 border-2 ${isSelected ? 'border-background' : 'border-foreground'} flex-shrink-0 relative`}>
+                      <img
+                        src={book.cover_image}
+                        alt={book.title}
+                        className="w-full h-full object-cover"
+                      />
+                      {/* Pixel overlay */}
+                      <div className={`absolute bottom-0 left-0 w-2 h-2 ${accentColor.bg}`}></div>
+                    </div>
+                    <div className="flex-1 space-y-2">
+                      <h3
+                        className={`font-bold font-sans text-sm tracking-wide ${
+                          isSelected ? 'text-background' : 'text-foreground'
+                        }`}
+                      >
+                        {book.title.toUpperCase()}
+                      </h3>
+                      <p
+                        className={`text-xs font-sans ${
+                          isSelected ? 'text-background opacity-80' : 'text-muted-foreground'
+                        }`}
+                      >
+                        BY {book.author.toUpperCase()}
+                      </p>
+                      <p
+                        className={`text-xs font-sans ${
+                          isSelected ? 'text-background opacity-80' : 'text-muted-foreground'
+                        }`}
+                      >
+                        {Math.floor(book.duration / 60)}M {book.duration % 60}S
+                      </p>
+                    </div>
+                    {isSelected && (
+                      <div className="flex items-center">
+                        <div className={`w-6 h-6 border-2 border-background ${accentColor.bg} flex items-center justify-center`}>
+                          <div className="w-3 h-3 bg-foreground" />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Start Button */}
+        <div className="flex justify-center pt-8">
+          <div className="flex flex-col items-center gap-6">
+            {/* Decorative pixel line above */}
+            <div className="flex gap-2">
+              <div className="w-2 h-2 bg-accent-blue"></div>
+              <div className="w-2 h-2 bg-accent-purple"></div>
+              <div className="w-2 h-2 bg-accent-pink"></div>
+            </div>
+
+            <div className="relative">
+              {/* Pixel corner decorations */}
+              <div className="absolute -top-2 -left-2 w-3 h-3 bg-accent-blue"></div>
+              <div className="absolute -top-2 -right-2 w-3 h-3 bg-accent-purple"></div>
+              <div className="absolute -bottom-2 -left-2 w-3 h-3 bg-accent-green"></div>
+              <div className="absolute -bottom-2 -right-2 w-3 h-3 bg-accent-pink"></div>
+
+              <button
+                onClick={handleStart}
+                className="border-4 border-foreground bg-background hover:bg-foreground hover:text-background px-16 py-4 font-sans font-bold text-lg tracking-widest transition-all active:translate-y-1"
+              >
+                {startButtonText.toUpperCase()}
+              </button>
+            </div>
+
+            {/* Pixel decorations bottom */}
+            <div className="flex gap-2">
+              <div className="w-2 h-2 bg-accent-yellow"></div>
+              <div className="w-2 h-2 bg-accent-green"></div>
+              <div className="w-2 h-2 bg-accent-blue"></div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

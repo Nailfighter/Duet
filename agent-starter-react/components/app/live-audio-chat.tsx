@@ -6,7 +6,7 @@ import {
   useSessionMessages,
   useVoiceAssistant,
 } from '@livekit/components-react';
-import { Microphone, MicrophoneSlash, Phone, PhoneDisconnect } from '@phosphor-icons/react';
+import { Microphone, MicrophoneSlash, ProhibitInset } from '@phosphor-icons/react';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/livekit/scroll-area/scroll-area';
 
@@ -23,6 +23,7 @@ export function LiveAudioChat() {
   const { state: agentState } = useVoiceAssistant();
   const [messages, setMessages] = useState<Message[]>([]);
   const [isMicMuted, setIsMicMuted] = useState(false);
+  const [isAIDisabled, setIsAIDisabled] = useState(false);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
   // Convert LiveKit messages to our message format
@@ -41,22 +42,27 @@ export function LiveAudioChat() {
     }
   }, [livekitMessages]);
 
-  const handleConnect = () => {
-    if (session.isConnected) {
-      session.end();
-    } else {
-      session.start();
+  const handleMicToggle = async () => {
+    if (session.room?.localParticipant) {
+      const newMutedState = !isMicMuted;
+      await session.room.localParticipant.setMicrophoneEnabled(!newMutedState);
+      setIsMicMuted(newMutedState);
     }
   };
 
-  const handleMicToggle = async () => {
+  const handleAIToggle = () => {
+    const newAIDisabled = !isAIDisabled;
+    setIsAIDisabled(newAIDisabled);
+
     if (session.room?.localParticipant) {
-      const audioTrack = session.room.localParticipant.getTrackPublication(
-        'microphone'
-      );
-      if (audioTrack) {
-        await session.room.localParticipant.setMicrophoneEnabled(!isMicMuted);
-        setIsMicMuted(!isMicMuted);
+      if (newAIDisabled) {
+        // Mute microphone when AI is disabled to prevent input
+        session.room.localParticipant.setMicrophoneEnabled(false);
+        setIsMicMuted(true);
+      } else {
+        // Re-enable microphone when AI is re-enabled
+        session.room.localParticipant.setMicrophoneEnabled(true);
+        setIsMicMuted(false);
       }
     }
   };
@@ -64,52 +70,68 @@ export function LiveAudioChat() {
   const getAgentStatusText = () => {
     switch (agentState) {
       case 'listening':
-        return 'Agent is listening...';
+        return 'LISTENING';
       case 'thinking':
-        return 'Agent is thinking...';
+        return 'THINKING';
       case 'speaking':
-        return 'Agent is speaking...';
+        return 'SPEAKING';
       default:
-        return 'Ready to chat';
-    }
-  };
-
-  const getAgentStatusColor = () => {
-    switch (agentState) {
-      case 'listening':
-        return 'bg-green-500';
-      case 'thinking':
-        return 'bg-yellow-500';
-      case 'speaking':
-        return 'bg-blue-500';
-      default:
-        return 'bg-gray-400';
+        return 'IDLE';
     }
   };
 
   return (
-    <div className="flex h-full flex-col bg-white">
+    <div className="flex h-full w-full flex-col border-l-2 border-foreground bg-background">
       {/* Header */}
-      <div className="border-b border-gray-200 px-6 py-6">
+      <div className="eink-box border-l-0 border-t-0 border-r-0 px-6 py-6 relative">
+        {/* Pixel decorations */}
+        <div className="absolute top-2 right-2 flex gap-2">
+          <div className="w-2 h-2 bg-accent-green"></div>
+          <div className="w-2 h-2 bg-accent-blue"></div>
+          <div className="w-2 h-2 bg-accent-purple"></div>
+        </div>
+
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-xl font-bold text-gray-900">AI Assistant</h2>
-            <div className="mt-1 flex items-center gap-2">
-              <div className={cn('h-2 w-2 rounded-full', getAgentStatusColor())} />
-              <p className="text-sm text-gray-600">{getAgentStatusText()}</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            {/* Connection Status Badge */}
-            <div
-              className={cn(
-                'rounded-full px-3 py-1 text-xs font-medium',
-                session.isConnected
-                  ? 'bg-gray-900 text-white'
-                  : 'bg-gray-200 text-gray-700'
-              )}
-            >
-              {session.isConnected ? 'Connected' : 'Disconnected'}
+            <h2 className="text-xl font-bold text-foreground font-sans tracking-wider">
+              AGENT CONVERSATION
+            </h2>
+            <div className="mt-2 flex items-center gap-3">
+              <div
+                className={cn(
+                  'border-2 border-foreground px-3 py-1 text-xs font-sans font-bold tracking-wide relative',
+                  agentState === 'listening' && 'bg-accent-green',
+                  agentState === 'thinking' && 'bg-accent-yellow',
+                  agentState === 'speaking' && 'bg-accent-blue',
+                  agentState === 'idle' && 'bg-background'
+                )}
+              >
+                {agentState === 'listening' && (
+                  <div className="absolute -top-1 -left-1 w-1.5 h-1.5 bg-accent-purple"></div>
+                )}
+                {agentState === 'thinking' && (
+                  <div className="absolute -top-1 -left-1 w-1.5 h-1.5 bg-accent-pink animate-pulse"></div>
+                )}
+                {agentState === 'speaking' && (
+                  <div className="absolute -top-1 -left-1 w-1.5 h-1.5 bg-accent-yellow animate-pulse"></div>
+                )}
+                <span className="text-foreground">
+                  {getAgentStatusText()}
+                </span>
+              </div>
+              <div
+                className={cn(
+                  'border-2 border-foreground px-3 py-1 text-xs font-sans font-bold tracking-wide relative',
+                  session.isConnected ? 'bg-accent-purple' : 'bg-background'
+                )}
+              >
+                {session.isConnected && (
+                  <div className="absolute -top-1 -right-1 w-1.5 h-1.5 bg-accent-green animate-pulse"></div>
+                )}
+                <span className="text-foreground">
+                  {session.isConnected ? 'CONNECTED' : 'OFFLINE'}
+                </span>
+              </div>
             </div>
           </div>
         </div>
@@ -119,68 +141,85 @@ export function LiveAudioChat() {
       <ScrollArea ref={scrollAreaRef} className="flex-1 px-6 py-4">
         {!session.isConnected && messages.length === 0 && (
           <div className="flex h-full flex-col items-center justify-center text-center">
-            <div className="mb-6 rounded-full bg-gray-100 p-8">
-              <Phone size={56} className="text-gray-900" weight="fill" />
+            <div className="eink-box-dashed p-12 mb-6">
+              <div className="w-14 h-14 mx-auto bg-foreground"></div>
             </div>
-            <h3 className="mb-2 text-lg font-bold text-gray-900">
-              Connect to AI Assistant
+            <h3 className="mb-3 text-lg font-bold text-foreground font-mono tracking-wider">
+              WAITING FOR CONNECTION
             </h3>
-            <p className="mb-6 max-w-sm text-sm text-gray-600">
-              Start a conversation with your AI companion. Ask questions, get summaries, or
-              discuss the audiobook you're listening to.
+            <p className="mb-6 max-w-sm text-xs text-muted-foreground font-mono leading-relaxed">
+              The AI companion will connect automatically when ready. Use the microphone button to
+              speak with your AI reading companion.
             </p>
           </div>
         )}
 
         {messages.length > 0 && (
-          <div className="space-y-3">
-            {messages.map((message) => (
-              <div
-                key={message.id}
-                className={cn(
-                  'flex',
-                  message.sender === 'user' ? 'justify-end' : 'justify-start'
-                )}
-              >
+          <div className="space-y-4">
+            {messages.map((message, idx) => {
+              const isUser = message.sender === 'user';
+
+              // Alternate corner pixel colors for variety
+              const cornerColors = ['bg-accent-pink', 'bg-accent-yellow', 'bg-accent-green'];
+              const cornerColor = cornerColors[idx % cornerColors.length];
+
+              return (
                 <div
+                  key={message.id}
                   className={cn(
-                    'max-w-[80%] rounded-2xl px-4 py-3',
-                    message.sender === 'user'
-                      ? 'bg-gray-900 text-white'
-                      : 'bg-gray-100 text-gray-900'
+                    'flex flex-col',
+                    isUser ? 'items-end' : 'items-start'
                   )}
                 >
-                  <p className="text-sm leading-relaxed">{message.text}</p>
-                  <p
+                  <div className="mb-1 text-xs font-sans font-bold tracking-wide text-muted-foreground flex items-center gap-2">
+                    <div className={cn('w-2 h-2', isUser ? 'bg-accent-blue' : 'bg-accent-purple')}></div>
+                    {isUser ? 'YOU' : 'AI'}
+                  </div>
+                  <div
                     className={cn(
-                      'mt-1 text-xs',
-                      message.sender === 'user' ? 'text-gray-400' : 'text-gray-500'
+                      'max-w-[85%] border-2 border-foreground p-4 relative',
+                      isUser ? 'bg-accent-blue' : 'bg-accent-purple'
                     )}
                   >
-                    {message.timestamp.toLocaleTimeString([], {
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })}
-                  </p>
+                    {/* Corner pixel */}
+                    <div className={cn(
+                      'absolute top-1 w-1.5 h-1.5',
+                      isUser ? 'right-1' : 'left-1',
+                      cornerColor
+                    )}></div>
+
+                    <p className="text-sm font-sans leading-relaxed text-foreground">
+                      {message.text}
+                    </p>
+                    <p className="mt-2 text-xs font-sans text-foreground opacity-60">
+                      {message.timestamp.toLocaleTimeString([], {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
+                    </p>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
 
-        {/* Agent Typing Indicator */}
+        {/* Agent Thinking Indicator */}
         {agentState === 'thinking' && (
-          <div className="flex justify-start">
-            <div className="max-w-[80%] rounded-2xl bg-gray-100 px-4 py-3">
-              <div className="flex gap-1">
-                <div className="h-2 w-2 animate-bounce rounded-full bg-gray-600" />
+          <div className="flex flex-col items-start mt-4">
+            <div className="mb-1 text-xs font-mono font-bold tracking-wide text-muted-foreground">
+              AI
+            </div>
+            <div className="eink-box-dashed px-4 py-3">
+              <div className="flex gap-2">
+                <div className="w-2 h-2 bg-foreground animate-pulse" />
                 <div
-                  className="h-2 w-2 animate-bounce rounded-full bg-gray-600"
-                  style={{ animationDelay: '0.1s' }}
+                  className="w-2 h-2 bg-foreground animate-pulse"
+                  style={{ animationDelay: '0.2s' }}
                 />
                 <div
-                  className="h-2 w-2 animate-bounce rounded-full bg-gray-600"
-                  style={{ animationDelay: '0.2s' }}
+                  className="w-2 h-2 bg-foreground animate-pulse"
+                  style={{ animationDelay: '0.4s' }}
                 />
               </div>
             </div>
@@ -188,17 +227,17 @@ export function LiveAudioChat() {
         )}
       </ScrollArea>
 
-      {/* Audio Visualizer (when speaking or listening) */}
+      {/* Audio Visualizer */}
       {session.isConnected && (agentState === 'speaking' || agentState === 'listening') && (
-        <div className="border-t border-gray-200 bg-gray-50 px-6 py-4">
-          <div className="flex items-center justify-center gap-1">
-            {[...Array(20)].map((_, i) => (
+        <div className="eink-box border-l-0 border-r-0 px-6 py-4">
+          <div className="flex items-end justify-center gap-1 h-12">
+            {[...Array(16)].map((_, i) => (
               <div
                 key={i}
-                className="bg-gray-900 w-1 rounded-full"
+                className="bg-foreground w-1"
                 style={{
-                  height: `${Math.random() * 40 + 10}px`,
-                  animationName: 'pulse',
+                  height: isMicMuted ? '10%' : `${Math.random() * 100}%`,
+                  animationName: isMicMuted ? 'none' : 'pulse',
                   animationDuration: `${0.5 + Math.random() * 0.5}s`,
                   animationTimingFunction: 'ease-in-out',
                   animationIterationCount: 'infinite',
@@ -211,19 +250,17 @@ export function LiveAudioChat() {
       )}
 
       {/* Control Bar */}
-      <div className="border-t border-gray-200 bg-white px-6 py-6">
-        <div className="flex items-center justify-center gap-3">
+      <div className="eink-box border-l-0 border-r-0 border-b-0 px-6 py-6">
+        <div className="flex items-center justify-center gap-4">
           {/* Microphone Toggle */}
           <button
             onClick={handleMicToggle}
-            disabled={!session.isConnected}
+            disabled={!session.isConnected || isAIDisabled}
             className={cn(
-              'flex h-14 w-14 items-center justify-center rounded-full border-2 transition-all',
-              session.isConnected
-                ? isMicMuted
-                  ? 'border-gray-900 bg-gray-900 text-white hover:bg-gray-800'
-                  : 'border-gray-900 bg-white text-gray-900 hover:bg-gray-50'
-                : 'border-gray-300 bg-gray-100 text-gray-400 cursor-not-allowed'
+              'eink-button p-4 transition-all relative',
+              (!session.isConnected || isAIDisabled) && 'opacity-30 cursor-not-allowed',
+              isMicMuted && session.isConnected && !isAIDisabled && 'bg-accent-yellow',
+              !isMicMuted && session.isConnected && !isAIDisabled && 'bg-accent-green hover:bg-accent-blue'
             )}
           >
             {isMicMuted ? (
@@ -233,29 +270,29 @@ export function LiveAudioChat() {
             )}
           </button>
 
-          {/* Connect/Disconnect Button */}
+          {/* Stop AI Button */}
           <button
-            onClick={handleConnect}
+            onClick={handleAIToggle}
+            disabled={!session.isConnected}
             className={cn(
-              'flex h-16 w-16 items-center justify-center rounded-full transition-all',
-              session.isConnected
-                ? 'bg-gray-900 text-white hover:bg-gray-800'
-                : 'bg-gray-900 text-white hover:bg-gray-800'
+              'eink-button p-4 transition-all relative',
+              !session.isConnected && 'opacity-30 cursor-not-allowed',
+              isAIDisabled && session.isConnected && 'bg-accent-pink',
+              !isAIDisabled && session.isConnected && 'bg-accent-purple hover:bg-accent-blue'
             )}
           >
-            {session.isConnected ? (
-              <PhoneDisconnect size={28} weight="fill" />
-            ) : (
-              <Phone size={28} weight="fill" />
-            )}
+            <ProhibitInset size={24} weight="fill" />
           </button>
         </div>
 
         {/* Helper Text */}
-        <p className="mt-4 text-center text-xs text-gray-600">
-          {session.isConnected
-            ? 'Speak naturally - the AI can hear you'
-            : 'Click the phone button to start chatting'}
+        <div className="eink-divider-dashed mt-6 mb-3" />
+        <p className="text-center text-xs text-muted-foreground font-mono">
+          {!session.isConnected
+            ? 'WAITING FOR CONNECTION'
+            : isAIDisabled
+            ? 'AI DISABLED - PRESS STOP TO ENABLE'
+            : 'SPEAK NATURALLY'}
         </p>
       </div>
     </div>

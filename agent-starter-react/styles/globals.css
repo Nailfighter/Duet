@@ -4,38 +4,38 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
+  --radius: 0rem;
+  --background: oklch(0.98 0 0);
+  --foreground: oklch(0.1 0 0);
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
+  --card-foreground: oklch(0.1 0 0);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --popover-foreground: oklch(0.1 0 0);
+  --primary: oklch(0.1 0 0);
+  --primary-foreground: oklch(0.98 0 0);
+  --secondary: oklch(0.95 0 0);
+  --secondary-foreground: oklch(0.1 0 0);
+  --muted: oklch(0.93 0 0);
+  --muted-foreground: oklch(0.4 0 0);
+  --accent: oklch(0.1 0 0);
+  --accent-foreground: oklch(0.98 0 0);
+  --destructive: oklch(0.3 0 0);
+  --border: oklch(0.1 0 0);
+  --input: oklch(0.95 0 0);
+  --ring: oklch(0.1 0 0);
+  --chart-1: oklch(0.2 0 0);
+  --chart-2: oklch(0.3 0 0);
+  --chart-3: oklch(0.4 0 0);
+  --chart-4: oklch(0.5 0 0);
+  --chart-5: oklch(0.6 0 0);
+  --sidebar: oklch(0.98 0 0);
+  --sidebar-foreground: oklch(0.1 0 0);
+  --sidebar-primary: oklch(0.1 0 0);
+  --sidebar-primary-foreground: oklch(0.98 0 0);
+  --sidebar-accent: oklch(0.95 0 0);
+  --sidebar-accent-foreground: oklch(0.1 0 0);
+  --sidebar-border: oklch(0.1 0 0);
+  --sidebar-ring: oklch(0.1 0 0);
 }
 
 .dark {
@@ -79,6 +79,8 @@
   --font-mono:
     var(--font-commit-mono), ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
     'Liberation Mono', 'Courier New', monospace;
+  --font-display:
+    var(--font-space-mono), var(--font-commit-mono), monospace;
 
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -157,5 +159,121 @@
     100% {
       background-position: 250% 0;
     }
+  }
+
+  /* Color accents for minimalist design */
+  :root {
+    --accent-blue: #5B9FFF;
+    --accent-purple: #A78BFA;
+    --accent-pink: #F472B6;
+    --accent-green: #6EE7B7;
+    --accent-yellow: #FCD34D;
+  }
+
+  /* Display header font - retro monospace */
+  .font-display {
+    font-family: var(--font-display);
+    letter-spacing: 0.05em;
+  }
+
+  /* E-ink retro styling utilities */
+  .eink-box {
+    border: 2px solid var(--foreground);
+    background: var(--background);
+  }
+
+  .eink-box-dashed {
+    border: 2px dashed var(--foreground);
+    background: var(--background);
+  }
+
+  .eink-divider {
+    border-top: 1px solid var(--foreground);
+  }
+
+  .eink-divider-dashed {
+    border-top: 1px dashed var(--foreground);
+  }
+
+  .eink-button {
+    border: 1px solid var(--foreground);
+    background: var(--background);
+    transition: all 0.15s ease;
+  }
+
+  .eink-button:hover {
+    background: var(--foreground);
+    color: var(--background);
+  }
+
+  .eink-button:active {
+    transform: translateY(2px);
+  }
+
+  /* Pixel decorations */
+  .pixel-dot {
+    width: 8px;
+    height: 8px;
+    display: inline-block;
+  }
+
+  .pixel-corner {
+    width: 12px;
+    height: 12px;
+    position: relative;
+  }
+
+  .pixel-corner::before {
+    content: '';
+    position: absolute;
+    width: 4px;
+    height: 4px;
+    background: currentColor;
+  }
+
+  /* Colorful accent utilities */
+  .accent-blue { color: var(--accent-blue); }
+  .accent-purple { color: var(--accent-purple); }
+  .accent-pink { color: var(--accent-pink); }
+  .accent-green { color: var(--accent-green); }
+  .accent-yellow { color: var(--accent-yellow); }
+
+  .bg-accent-blue { background-color: var(--accent-blue); }
+  .bg-accent-purple { background-color: var(--accent-purple); }
+  .bg-accent-pink { background-color: var(--accent-pink); }
+  .bg-accent-green { background-color: var(--accent-green); }
+  .bg-accent-yellow { background-color: var(--accent-yellow); }
+
+  .border-accent-blue { border-color: var(--accent-blue); }
+  .border-accent-purple { border-color: var(--accent-purple); }
+  .border-accent-pink { border-color: var(--accent-pink); }
+  .border-accent-green { border-color: var(--accent-green); }
+  .border-accent-yellow { border-color: var(--accent-yellow); }
+
+  /* Force sharp corners on all elements */
+  *,
+  *::before,
+  *::after {
+    border-radius: 0 !important;
+  }
+
+  /* Hide scrollbar but keep functionality */
+  .scrollbar-hide {
+    -ms-overflow-style: none !important;
+    scrollbar-width: none !important;
+  }
+
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+  }
+
+  .scrollbar-hide::-webkit-scrollbar-track {
+    display: none !important;
+  }
+
+  .scrollbar-hide::-webkit-scrollbar-thumb {
+    display: none !important;
   }
 }

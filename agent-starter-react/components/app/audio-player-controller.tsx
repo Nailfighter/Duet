@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Pause, Play, SkipBack, SkipForward } from '@phosphor-icons/react';
 import { useSessionContext } from '@livekit/components-react';
+import { cn } from '@/lib/utils';
 
 interface Audiobook {
   id: string;
@@ -14,7 +15,12 @@ interface Audiobook {
   transcript_file?: string;
 }
 
-export function AudioPlayer() {
+interface AudioPlayerControllerProps {
+  onTimeUpdate?: (time: number) => void;
+  onAudiobookChange?: (audiobook: Audiobook | null) => void;
+}
+
+export function AudioPlayerController({ onTimeUpdate, onAudiobookChange }: AudioPlayerControllerProps) {
   const session = useSessionContext();
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -24,8 +30,6 @@ export function AudioPlayer() {
   const [audiobooks, setAudiobooks] = useState<Audiobook[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [volume, setVolume] = useState(1.0);
-  const [transcript, setTranscript] = useState<string>('');
-  const [currentTranscriptChunk, setCurrentTranscriptChunk] = useState<string>('');
   const audioRef = useRef<HTMLAudioElement>(null);
   const resumeTimerRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -36,27 +40,42 @@ export function AudioPlayer() {
       .then((data: Audiobook[]) => {
         setAudiobooks(data);
         if (data.length > 0) {
-          // Check if there's a selected audiobook from welcome screen
           const savedIndex = localStorage.getItem('selectedAudiobookIndex');
           const shouldAutoplay = localStorage.getItem('autoplayAudiobook');
           const bookIndex = savedIndex ? parseInt(savedIndex, 10) : 0;
 
+          console.log('[AudioPlayer] Loading audiobook index:', bookIndex, 'from localStorage:', savedIndex);
+
           setCurrentIndex(bookIndex);
           const book = data[bookIndex] || data[0];
           setAudiobook(book);
+          console.log('[AudioPlayer] Set audiobook to:', book.title);
+          onAudiobookChange?.(book);
 
           if (book.duration) {
             setDuration(book.duration);
           }
-          loadTranscript(book);
 
-          // Clear the localStorage flags
-          localStorage.removeItem('selectedAudiobookIndex');
+          // Notify agent about initial audiobook selection (if not the first one)
+          if (bookIndex !== 0 && session.room?.localParticipant) {
+            const encoder = new TextEncoder();
+            const message = {
+              type: 'audiobook_changed',
+              index: bookIndex,
+              audiobook_id: book.id,
+            };
+            const msgData = encoder.encode(JSON.stringify(message));
+            session.room.localParticipant.publishData(msgData, { reliable: true });
+            console.log('[AudioPlayer] Notified agent of initial audiobook:', book.id);
+          }
 
-          // Autoplay if requested
+          // Clear localStorage after a delay to handle React Strict Mode double-mount
+          setTimeout(() => {
+            localStorage.removeItem('selectedAudiobookIndex');
+          }, 100);
+
           if (shouldAutoplay === 'true') {
             localStorage.removeItem('autoplayAudiobook');
-            // Wait for audio to be ready, then play
             setTimeout(() => {
               if (audioRef.current) {
                 audioRef.current.play()
@@ -70,29 +89,10 @@ export function AudioPlayer() {
       .catch((error) => console.error('Error loading audiobook data:', error));
   }, []);
 
-  // Load transcript for current audiobook
-  const loadTranscript = (book: Audiobook) => {
-    if (book.transcript_file) {
-      fetch(`/transcript/${book.transcript_file.replace('.vtt', '_trans.txt')}`)
-        .then((res) => res.text())
-        .then((text) => {
-          setTranscript(text);
-        })
-        .catch((error) => console.error('Error loading transcript:', error));
-    }
-  };
-
-  // Update current transcript chunk based on playback time
+  // Notify parent of audiobook changes
   useEffect(() => {
-    if (transcript && duration > 0) {
-      const wordsPerSecond = 2.5; // Average speaking rate
-      const charsPerSecond = wordsPerSecond * 5; // Average word length
-      const startChar = Math.floor(currentTime * charsPerSecond);
-      const chunkLength = 150; // Characters to display
-      const chunk = transcript.slice(startChar, startChar + chunkLength);
-      setCurrentTranscriptChunk(chunk);
-    }
-  }, [currentTime, transcript, duration]);
+    onAudiobookChange?.(audiobook);
+  }, [audiobook, onAudiobookChange]);
 
   // Apply volume changes
   useEffect(() => {
@@ -188,7 +188,11 @@ export function AudioPlayer() {
     const audio = audioRef.current;
     if (!audio) return;
 
-    const updateTime = () => setCurrentTime(audio.currentTime);
+    const updateTime = () => {
+      const time = audio.currentTime;
+      setCurrentTime(time);
+      onTimeUpdate?.(time);
+    };
     const updateDuration = () => {
       if (audio.duration && !isNaN(audio.duration)) {
         setDuration(audio.duration);
@@ -212,7 +216,7 @@ export function AudioPlayer() {
       audio.removeEventListener('ended', handleEnded);
       clearResumeTimer();
     };
-  }, [audiobook]);
+  }, [audiobook, onTimeUpdate]);
 
   const togglePlayPause = () => {
     if (audioRef.current) {
@@ -238,11 +242,11 @@ export function AudioPlayer() {
     setCurrentIndex(nextIdx);
     const nextBook = audiobooks[nextIdx];
     setAudiobook(nextBook);
+    onAudiobookChange?.(nextBook);
     setCurrentTime(0);
     if (nextBook.duration) {
       setDuration(nextBook.duration);
     }
-    loadTranscript(nextBook);
 
     if (session.room?.localParticipant) {
       const encoder = new TextEncoder();
@@ -279,11 +283,11 @@ export function AudioPlayer() {
     setCurrentIndex(prevIdx);
     const prevBook = audiobooks[prevIdx];
     setAudiobook(prevBook);
+    onAudiobookChange?.(prevBook);
     setCurrentTime(0);
     if (prevBook.duration) {
       setDuration(prevBook.duration);
     }
-    loadTranscript(prevBook);
 
     if (session.room?.localParticipant) {
       const encoder = new TextEncoder();
@@ -339,18 +343,17 @@ export function AudioPlayer() {
 
   if (!audiobook) {
     return (
-      <div className="flex h-full items-center justify-center bg-background">
-        <div className="eink-box px-8 py-4 font-mono text-sm">LOADING...</div>
+      <div className="flex h-full w-full items-center justify-center bg-background">
+        <div className="eink-box px-8 py-4 font-mono text-sm text-foreground">LOADING...</div>
       </div>
     );
   }
 
   return (
-    <div className="flex h-full flex-col bg-background p-8">
-      <div className="flex flex-col h-full max-w-md mx-auto w-full justify-between">
+    <div className="flex h-full flex-col bg-background p-8 w-full">
+      <div className="flex flex-col h-full w-full justify-between">
         {/* Book Cover */}
         <div className="eink-box p-4 relative">
-          {/* Pixel accent corners */}
           <div className="absolute top-2 left-2 w-2 h-2 bg-accent-purple"></div>
           <div className="absolute top-2 right-2 w-2 h-2 bg-accent-blue"></div>
 
@@ -360,7 +363,6 @@ export function AudioPlayer() {
               alt={audiobook.title}
               className="h-full w-full object-cover"
             />
-            {/* Playing indicator pixel */}
             {isPlaying && (
               <div className="absolute bottom-2 right-2 w-3 h-3 bg-accent-green animate-pulse"></div>
             )}
@@ -376,14 +378,22 @@ export function AudioPlayer() {
           <p className="text-xs font-sans text-muted-foreground mt-1">
             {audiobook.author.toUpperCase()}
           </p>
-        </div>
 
-        {/* Live Transcription */}
-        <div className="eink-box-dashed p-4 mt-4 min-h-[80px] relative">
-          <div className="absolute top-2 left-2 w-2 h-2 bg-accent-yellow"></div>
-          <div className="absolute bottom-2 right-2 w-2 h-2 bg-accent-blue"></div>
-          <div className="text-xs font-sans text-foreground leading-relaxed text-center">
-            {currentTranscriptChunk || 'Waiting for playback...'}
+          {/* Playback Status Badge */}
+          <div className="mt-3 flex justify-center">
+            <div
+              className={cn(
+                'border-2 border-foreground px-3 py-1 text-xs font-sans font-bold tracking-wide relative',
+                isPlaying ? 'bg-accent-green' : 'bg-accent-yellow'
+              )}
+            >
+              {isPlaying && (
+                <div className="absolute -top-1 -left-1 w-1.5 h-1.5 bg-accent-blue animate-pulse"></div>
+              )}
+              <span className="text-foreground">
+                {isPlaying ? 'PLAYING' : 'PAUSED'}
+              </span>
+            </div>
           </div>
         </div>
 
@@ -411,35 +421,34 @@ export function AudioPlayer() {
 
         {/* Player Controls */}
         <div className="flex items-center justify-center gap-4 mt-6">
-          {/* Previous */}
           <button
             onClick={previousAudiobook}
-            className="eink-button p-3"
+            className="eink-button p-3 relative bg-accent-purple hover:bg-accent-pink"
           >
             <SkipBack size={20} weight="fill" />
           </button>
 
-          {/* Rewind 30s */}
           <button
             onClick={() => {
               if (audioRef.current) {
                 audioRef.current.currentTime = Math.max(0, audioRef.current.currentTime - 30);
               }
             }}
-            className="eink-button p-3 font-mono text-xs font-bold"
+            className="eink-button p-3 font-mono text-xs font-bold relative bg-accent-blue hover:bg-accent-green"
           >
             -30
           </button>
 
-          {/* Play/Pause */}
           <button
             onClick={togglePlayPause}
-            className="eink-button p-4"
+            className={cn(
+              "eink-button p-4 relative",
+              isPlaying ? "bg-accent-green hover:bg-accent-blue" : "bg-accent-yellow hover:bg-accent-pink"
+            )}
           >
             {isPlaying ? <Pause size={28} weight="fill" /> : <Play size={28} weight="fill" />}
           </button>
 
-          {/* Forward 30s */}
           <button
             onClick={() => {
               if (audioRef.current) {
@@ -449,15 +458,14 @@ export function AudioPlayer() {
                 );
               }
             }}
-            className="eink-button p-3 font-mono text-xs font-bold"
+            className="eink-button p-3 font-mono text-xs font-bold relative bg-accent-blue hover:bg-accent-green"
           >
             +30
           </button>
 
-          {/* Next */}
           <button
             onClick={nextAudiobook}
-            className="eink-button p-3"
+            className="eink-button p-3 relative bg-accent-purple hover:bg-accent-pink"
           >
             <SkipForward size={20} weight="fill" />
           </button>
@@ -467,9 +475,9 @@ export function AudioPlayer() {
         <div className="flex justify-center mt-4">
           <button
             onClick={changePlaybackSpeed}
-            className="eink-button px-6 py-2 font-sans text-sm font-bold relative"
+            className="eink-button px-6 py-2 font-sans text-sm font-bold relative bg-accent-pink hover:bg-accent-purple"
           >
-            <div className="absolute -top-1 -left-1 w-1.5 h-1.5 bg-accent-purple"></div>
+            <div className="absolute -top-1 -left-1 w-1.5 h-1.5 bg-accent-yellow"></div>
             <div className="absolute -top-1 -right-1 w-1.5 h-1.5 bg-accent-blue"></div>
             {playbackSpeed}x SPEED
           </button>

@@ -1,18 +1,41 @@
 'use client';
 
-import { AudioPlayer } from '@/components/app/audio-player';
+import { useState } from 'react';
+import { AudioPlayerController } from '@/components/app/audio-player-controller';
+import { TranscriptView } from '@/components/app/transcript-view';
 import { LiveAudioChat } from '@/components/app/live-audio-chat';
 
+interface Audiobook {
+  id: string;
+  title: string;
+  author: string;
+  cover_image: string;
+  audio_file: string;
+  duration: number;
+  transcript_file?: string;
+}
+
 export function SplitScreenLayout() {
+  const [currentTime, setCurrentTime] = useState(0);
+  const [audiobook, setAudiobook] = useState<Audiobook | null>(null);
+
   return (
-    <div className="flex h-screen w-full flex-col md:flex-row">
-      {/* Left Half - Audio Player */}
-      <div className="flex h-1/2 w-full items-center justify-center md:h-full md:w-1/2">
-        <AudioPlayer />
+    <div className="flex h-screen w-screen bg-background overflow-hidden">
+      {/* Left Third - Audio Player Controller */}
+      <div className="flex h-full w-1/3 flex-shrink-0">
+        <AudioPlayerController
+          onTimeUpdate={setCurrentTime}
+          onAudiobookChange={setAudiobook}
+        />
       </div>
 
-      {/* Right Half - Live Audio Chat */}
-      <div className="h-1/2 w-full md:h-full md:w-1/2">
+      {/* Middle Third - Transcript */}
+      <div className="flex h-full w-1/3 flex-shrink-0">
+        <TranscriptView currentTime={currentTime} audiobook={audiobook} />
+      </div>
+
+      {/* Right Third - Live Audio Chat */}
+      <div className="flex h-full w-1/3 flex-shrink-0">
         <LiveAudioChat />
       </div>
     </div>

@@ -3,7 +3,7 @@
 </p>
 
 <h1 align="center">
-  Echo AI - Audiobook Companion
+  Duet - Audiobook Companion
   <br>
 </h1>
 
@@ -27,11 +27,11 @@
   </a>
 </p>
 
-## What is Echo AI ?
+## What is Duet ?
 
-Echo AI is a fully dynamic, Voice AI companion for your audiobooks. Built with LiveKit, it seamlessly synchronizes with the audiobook you're listening to, allowing you to ask questions, explore character backgrounds, and recap recent events—all completely spoiler-free. 
+Duet is a fully dynamic, Voice AI companion for your audiobooks. Built with LiveKit, it seamlessly synchronizes with the audiobook you're listening to, allowing you to ask questions, explore character backgrounds, and recap recent events—all completely spoiler-free. 
 
-By mapping playback time to transcript text on the fly, Echo AI knows exactly where you are in the story, transforming independent listening into an engaging, interactive journey.
+By mapping playback time to transcript text on the fly, Duet knows exactly where you are in the story, transforming independent listening into an engaging, interactive journey.
 
 ## Features
 
@@ -65,7 +65,7 @@ The project is structured as a fullstack application across three primary layers
 1. **Clone the repository**
    ```bash
    git clone <repository-url>
-   cd Echo-Audiobook-Companion
+   cd Duet-Audiobook-Companion
    ```
 
 2. **Set up credentials**
@@ -109,7 +109,7 @@ This will automatically spin up the Python background agent and launch the React
 Adding your own books is straightforward! Follow our [Adding Audiobook Guide](Adding_Audiobook.md) for full formatting details. Essentially:
 1. Provide an `mp3` file, cover `jpg`, and a plain text `txt` transcript.
 2. Update the `audiobooks.json` file in `agent-starter-react/public`.
-3. Startup the application! Echo AI automatically adapts to the selected title.
+3. Startup the application! Duet automatically adapts to the selected title.
 
 ## Technologies Used
 

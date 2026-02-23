@@ -1,6 +1,6 @@
 # How to Add New Audiobooks
 
-This guide explains how to add new audiobooks to your Echo AI Audiobook Companion.
+This guide explains how to add new audiobooks to your Duet Audiobook Companion.
 
 ## Overview
 

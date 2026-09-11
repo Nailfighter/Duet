@@ -33,6 +33,14 @@ Duet is a fully dynamic, Voice AI companion for your audiobooks. Built with Live
 
 By mapping playback time to transcript text on the fly, Duet knows exactly where you are in the story, transforming independent listening into an engaging, interactive journey.
 
+## Demo Video
+
+<p align="center">
+  <a href="https://www.youtube.com/watch?v=uxMR5KtRFRk" target="_blank" rel="noopener noreferrer">
+    <img src="https://img.youtube.com/vi/uxMR5KtRFRk/maxresdefault.jpg" alt="Duet demo video" width="750px">
+  </a>
+</p>
+
 ## Features
 
 ### Voice AI & Interaction

@@ -1,0 +1,28 @@
+name: duet
+
+services:
+  backend:
+    build:
+      context: ..
+      dockerfile: docker/Backend/Dockerfile
+    container_name: duet-backend
+    restart: always
+    env_file:
+      - ../.env
+    networks:
+      - traefik_net
+
+  frontend:
+    build:
+      context: ..
+      dockerfile: docker/Frontend/Dockerfile
+    container_name: duet-frontend
+    restart: always
+    env_file:
+      - ../.env
+    networks:
+      - traefik_net
+
+networks:
+  traefik_net:
+    external: true

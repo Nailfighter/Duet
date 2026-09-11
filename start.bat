@@ -29,10 +29,10 @@ if not exist "%REACT_DIR%" (
     exit /b 1
 )
 
-:: Check .env.local
-if not exist "%PYTHON_DIR%\.env.local" (
-    echo %YELLOW%[Warning] .env.local not found in agent-starter-python%NC%
-    echo %YELLOW%   Please create .env.local with your LiveKit credentials%NC%
+:: Check root .env
+if not exist "%SCRIPT_DIR%.env" (
+    echo %YELLOW%[Warning] .env not found in %SCRIPT_DIR%%NC%
+    echo %YELLOW%   Please create a .env file in the repo root with your LiveKit/OpenAI credentials%NC%
     echo.
 )
 

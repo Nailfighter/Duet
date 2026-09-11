@@ -1,0 +1,17 @@
+.git
+.gitattributes
+.gitignore
+.claude
+*.md
+.env
+
+# Node / frontend
+agent-starter-react/node_modules
+agent-starter-react/.next
+
+# Python / backend
+agent-starter-python/.venv
+agent-starter-python/__pycache__
+agent-starter-python/.pytest_cache
+agent-starter-python/.ruff_cache
+agent-starter-python/tests

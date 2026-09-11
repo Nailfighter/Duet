@@ -33,10 +33,10 @@ if [ ! -d "$REACT_DIR" ]; then
     exit 1
 fi
 
-# Check if .env.local exists
-if [ ! -f "$PYTHON_DIR/.env.local" ]; then
-    echo -e "${YELLOW}⚠️  Warning: .env.local not found in agent-starter-python${NC}"
-    echo -e "${YELLOW}   Please create .env.local with your LiveKit credentials${NC}"
+# Check if root .env exists
+if [ ! -f "$SCRIPT_DIR/.env" ]; then
+    echo -e "${YELLOW}⚠️  Warning: .env not found in $SCRIPT_DIR${NC}"
+    echo -e "${YELLOW}   Please create a .env file in the repo root with your LiveKit/OpenAI credentials${NC}"
     echo ""
 fi
 

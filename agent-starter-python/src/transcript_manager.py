@@ -437,7 +437,7 @@ class TranscriptManager:
         if not self.openai_client:
             raise RuntimeError(
                 "OpenAI API key is required for semantic search. "
-                "Please set OPENAI_API_KEY in your .env.local file."
+                "Please set OPENAI_API_KEY in the root .env file."
             )
 
         # Get the ENTIRE transcript (no spoiler prevention for demo)

@@ -22,6 +22,12 @@ services:
       - ../.env
     networks:
       - traefik_net
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.duet-frontend.rule=Host(`duet.shreyansh-dev.app`)
+      - traefik.http.routers.duet-frontend.entrypoints=websecure
+      - traefik.http.routers.duet-frontend.tls=true
+      - traefik.http.services.duet-frontend.loadbalancer.server.port=3000
 
 networks:
   traefik_net:

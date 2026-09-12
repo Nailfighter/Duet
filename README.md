@@ -35,11 +35,9 @@ By mapping playback time to transcript text on the fly, Duet knows exactly where
 
 ## Demo
 
-<p align="center">
-  <a href="https://duet.shreyansh-dev.app" target="_blank" rel="noopener noreferrer">Live Site</a>
-  &nbsp;•&nbsp;
-  <a href="https://www.youtube.com/watch?v=uxMR5KtRFRk" target="_blank" rel="noopener noreferrer">Demo Video</a>
-</p>
+Try it out at https://duet.shreyansh-dev.app
+
+Watch the demo at https://www.youtube.com/watch?v=uxMR5KtRFRk
 
 ## Features
 

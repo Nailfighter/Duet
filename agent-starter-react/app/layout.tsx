@@ -67,6 +67,11 @@ export default async function RootLayout({ children }: RootLayoutProps) {
         {styles && <style>{styles}</style>}
         <title>{pageTitle}</title>
         <meta name="description" content={pageDescription} />
+        <script
+          defer
+          src="https://analytics.shreyanshsahu.co/script.js"
+          data-website-id="795ff2e7-cc37-4120-bd61-ef69653d7e82"
+        />
       </head>
       <body className="overflow-x-hidden">
         {children}
